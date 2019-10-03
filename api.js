@@ -2,13 +2,9 @@ const fs = require('fs');
 const readline = require('readline');
 const {google} = require('googleapis');
 
-// Load client secrets from a local file.
-// If modifying these scopes, delete token.json.
 const SCOPES = ['https://www.googleapis.com/auth/drive'];
-// The file token.json stores the user's access and refresh tokens, and is
-// created automatically when the authorization flow completes for the first
-// time.
 const TOKEN_PATH = 'token.json';
+
 exports.upload = async function(req, res) {
   fs.readFile('credentials.json', async (err, content) => {
     if (err) return console.log('Error loading client secret file:', err);
@@ -27,7 +23,6 @@ exports.upload = async function(req, res) {
       fields: 'id'
     }, function (err, file) {
       if (err) {
-        // Handle error
         console.error(err);
       } else {
         fs.readFile('./workspace.json', (err, data) => {
@@ -35,7 +30,10 @@ exports.upload = async function(req, res) {
           else {
             const workspace = JSON.parse(data);
             workspace.files.push(
-              req.file.originalname
+              {
+                "id": workspace.files.length,
+                "name": req.file.originalname
+              }
             );
             const json = JSON.stringify(workspace);
             fs.writeFileSync('./workspace.json', json);
@@ -102,7 +100,6 @@ exports.getFiles = function(req, res) {
     const filesData = fs.readFileSync('./workspace.json');
     const workspace = JSON.parse(filesData);
     const filesToSend = [];
-    console.log(workspace.files);
     await drive.files.list({
       pageSize: 1000,
       fields: 'nextPageToken, files(id, name, thumbnailLink)',
@@ -115,20 +112,34 @@ exports.getFiles = function(req, res) {
       if (err) return console.log('The API returned an error: ' + err);
       const files = await response.data.files;
       if (files.length) {
-        files.map((file) => {
-          if(workspace.files.includes(file.name)) {
+        await files.map(async (file) => {
+          let workspaceFile = await containsValue(workspace.files, file.name);
+          if(workspaceFile) {
+            console.log(workspaceFile);
             const fileToAdd = {
-              "id": file.id,
+              "id": workspaceFile.id,
               "name": file.name,
               "thumbnailLink": file.thumbnailLink,
             }
             filesToSend.push(fileToAdd);
           }
-        });
+          filesToSend.sort((a, b) => {
+            return a.id - b.id;
+          })
+        })
         console.log(filesToSend);
         res.send(filesToSend);
       } else {
         console.log('No files found.');
       }
-    });
+    })
   }
+
+function containsValue(arr, value) {
+  for(i = 0; i < arr.length; i++) {
+    if(arr[i].name == value) {
+      return arr[i];
+    } 
+  }
+  return;
+}
