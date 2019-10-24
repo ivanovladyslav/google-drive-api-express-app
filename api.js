@@ -1,5 +1,6 @@
 const fs = require('fs');
 const {google} = require('googleapis');
+const URL = require('./environment/env');
 
 class Api {
   constructor() {
@@ -8,13 +9,14 @@ class Api {
     this.AUTH = "";
     this.drive = "";
     this.oAuth2Client = "";
+    this.token = {};
 
     this.authenticate = async (req, res) => {
-      fs.readFile('credentials.json', async (err, content) => {
+      fs.readFile('./environment/credentials.json', async (err, content) => {
         const credentials = JSON.parse(content);
         const {client_secret, client_id, redirect_uris} = credentials.installed;
         this.oAuth2Client = new google.auth.OAuth2(
-            client_id, client_secret, redirect_uris[0]);
+            client_id, client_secret, URL+redirect_uris[0]);
         this.authorize(res);
       });
     }
@@ -22,14 +24,15 @@ class Api {
     this.authorize = async (res) => {
       // Check if we have previously stored a token.
       fs.readFile(this.TOKEN_PATH, "utf8", async (err, token) => {
-        if (err) {                   
+        if (Object.keys(this.token).length === 0) {                
           const authUrl = this.oAuth2Client.generateAuthUrl({
             access_type: 'offline',
             scope: this.SCOPES,
           });
           res.send(authUrl);
         } else {
-          this.oAuth2Client.setCredentials(JSON.parse(token));
+          console.log(this.token);
+          this.oAuth2Client.setCredentials(this.token);
           const auth = this.oAuth2Client;
           this.drive = google.drive({version: 'v3', auth });
           res.send({loggedIn: true})
@@ -42,6 +45,7 @@ class Api {
       this.oAuth2Client.getToken(req.query.code, (err, token) => {
         if (err) return console.error('Error retrieving access token', err);
         this.oAuth2Client.setCredentials(token);
+        this.token = token;
         // Store the token to disk for later program executions
         fs.writeFile(this.TOKEN_PATH, JSON.stringify(token), (err) => {
           if (err) return console.error(err);
@@ -170,7 +174,6 @@ class Api {
             filesToSend.push(fileToAdd);
           }
           
-
           filesToSend.sort((a, b) => {
             return a.id - b.id;
           })
