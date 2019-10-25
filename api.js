@@ -17,43 +17,35 @@ class Api {
         const {client_secret, client_id, redirect_uris} = credentials.installed;
         this.oAuth2Client = new google.auth.OAuth2(
             client_id, client_secret, URL+redirect_uris[0]);
-        this.authorize(res);
+        this.authorize(req, res);
       });
     }
 
-    this.authorize = async (res) => {
+    this.authorize = async (req, res) => {
       // Check if we have previously stored a token.
-      fs.readFile(this.TOKEN_PATH, "utf8", async (err, token) => {
-        if (Object.keys(this.token).length === 0) {                
+        if (Object.keys(req.query.token).length === 0) {
           const authUrl = this.oAuth2Client.generateAuthUrl({
             access_type: 'offline',
             scope: this.SCOPES,
           });
           res.send(authUrl);
         } else {
-          console.log(this.token);
           this.oAuth2Client.setCredentials(this.token);
           const auth = this.oAuth2Client;
           this.drive = google.drive({version: 'v3', auth });
-          res.send({loggedIn: true})
+          res.send({ token: this.token });
+          this.token = "";
         }
-      });
     }
     
     this.getAccessToken = (req, res) => {
-      console.log(req);
       this.oAuth2Client.getToken(req.query.code, (err, token) => {
         if (err) return console.error('Error retrieving access token', err);
         this.oAuth2Client.setCredentials(token);
         this.token = token;
-        // Store the token to disk for later program executions
-        fs.writeFile(this.TOKEN_PATH, JSON.stringify(token), (err) => {
-          if (err) return console.error(err);
-          console.log('Token stored to', this.TOKEN_PATH);
-          const auth = this.oAuth2Client;
-          this.drive = google.drive({version: 'v3', auth });
-          res.sendFile('./popup-close.html', {root: __dirname });
-        });
+        const auth = this.oAuth2Client;
+        this.drive = google.drive({version: 'v3', auth });
+        res.sendFile('./popup-close.html', {root: __dirname });
       });
     }
 
@@ -63,7 +55,9 @@ class Api {
 
     this.isAuthenticated = (req, res) => {
       if(this.drive != "") {
-        res.send({loggedIn: true})
+        res.send({ token: this.token });
+        this.token = "";
+        console.log(this.token);
       }
     }
 
@@ -80,22 +74,19 @@ class Api {
           media: media,
           fields: 'id'
         }, (err) => {
-          if (err) {
-            console.error(err);
-          } else {
+          if (err) { console.error(err); } 
+          else {
             fs.readFile('./workspace.json', (err, data) => {
               if(err) {console.log(err)}
               else {
                 const workspace = JSON.parse(data);
-                workspace.files.push(
-                  {
+                workspace.files.push({
                     "id": workspace.files.length,
                     "name": req.file.originalname,
                     "x": 100,
                     "y": 100,
                     "text": ""
-                  }
-                );
+                  });
                 const json = JSON.stringify(workspace);
                 fs.writeFileSync('./workspace.json', json);
               }
@@ -106,20 +97,17 @@ class Api {
     }
     
     this.uploadText = async (req, res) => {
-      console.log(req.body);
       fs.readFile('./workspace.json', (err, data) => {
         if(err) {console.log(err)}
         else {
           const workspace = JSON.parse(data);
-          workspace.files.push(
-            {
+          workspace.files.push({
               "id": workspace.files.length,
               "name": "note"+workspace.files.length,
               "x": 100,
               "y": 100,
               "text": ""
-            }
-          );
+            });
           const json = JSON.stringify(workspace);
           fs.writeFileSync('./workspace.json', json);
         }
@@ -131,7 +119,6 @@ class Api {
       const filesData = fs.readFileSync('./workspace.json');
       const workspace = JSON.parse(filesData);
       const filesToSend = [];
-      console.log(this.drive);
       this.drive.files.list({
         pageSize: 1000,
         fields: 'nextPageToken, files(id, name, thumbnailLink, webViewLink)',
@@ -146,7 +133,7 @@ class Api {
         if (files.length) {
           await files.map(async (file) => {
             let workspaceFile = await this.containsValue(workspace.files, file.name, false);
-            if(workspaceFile) {
+            if (workspaceFile) {
               const fileToAdd = {
                 "id": workspaceFile.id,
                 "name": file.name,
@@ -161,7 +148,7 @@ class Api {
           });
 
           let notes = await this.containsValue(workspace.files, "note", true);
-          for(let i = 0; i < notes.length; i++) {
+          for (let i = 0; i < notes.length; i++) {
             const fileToAdd = {
               "id": notes[i].id,
               "name": notes[i].name,
@@ -218,7 +205,6 @@ class Api {
           }
         }
       }
-
       const json = JSON.stringify(workspace);
       fs.writeFileSync('./workspace.json', json);
     }
