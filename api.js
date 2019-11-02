@@ -1,6 +1,7 @@
 const fs = require('fs');
 const {google} = require('googleapis');
 const URL = require('./environment/env');
+const request = require('request');
 
 class Api {
   constructor() {
@@ -22,21 +23,11 @@ class Api {
     }
 
     this.authorize = async (req, res) => {
-      // Check if we have previously stored a token.
-        if (Object.keys(req.query.token).length === 0) {
-          const authUrl = this.oAuth2Client.generateAuthUrl({
-            access_type: 'offline',
-            scope: this.SCOPES,
-          });
-          res.send(authUrl);
-        } else {
-          this.oAuth2Client.setCredentials(this.token);
-          const auth = this.oAuth2Client;
-          this.drive = google.drive({version: 'v3', auth });
-          console.log(auth);
-          res.send({ token: this.token, auth: auth });
-          this.token = "";
-        }
+      const authUrl = this.oAuth2Client.generateAuthUrl({
+        access_type: 'offline',
+        scope: this.SCOPES,
+      });
+      res.send(authUrl);
     }
     
     this.getAccessToken = (req, res) => {
@@ -57,9 +48,25 @@ class Api {
 
     this.isAuthenticated = (req, res) => {
       if(this.drive != "") {
-        console.log(this.oAuth2Client);
-        res.send({ token: this.token, auth: this.oAuth2Client });
-        this.token = "";
+        const app = this;
+        request('https://www.googleapis.com/oauth2/v3/tokeninfo?id_token='+app.token.id_token, (e, r, body) => {
+          if(!e && r.statusCode == 200) {
+            const id = JSON.parse(body).sub;
+            res.send({ userId: id });
+            app.token = "";
+            fs.readFile('./workspace.json', async (err, data) => {
+              if(err) {console.log(err)}
+              else {
+                const workspace = JSON.parse(data);
+                const userWorkspace = await this.containsValue(workspace.users, id, false);
+                if(!userWorkspace) {
+                  workspace.users.push({ name: id, files: []});
+                }
+                const json = JSON.stringify(workspace);
+                fs.writeFileSync('./workspace.json', json);
+              }});
+          }
+        })
       }
     }
 
@@ -94,9 +101,9 @@ class Api {
                 this.update(workspace.users, req.body.userId, "files", userWorkspace.files);
                 const json = JSON.stringify(workspace);
                 fs.writeFileSync('./workspace.json', json);
+                res.send();
               }
             });
-            res.send();
           }
         });
     }
@@ -109,9 +116,9 @@ class Api {
           const userWorkspace = await this.containsValue(workspace.users, req.body.userId, false);
           userWorkspace.files.push({
               "id": userWorkspace.files.length,
-              "name": "note" + userWorkspace.files.length,
-              "x": 100,
-              "y": 100,
+              "name": "Заметка " + userWorkspace.files.length,
+              "x": Math.floor(Math.random() * 1000)+100,
+              "y": Math.floor(Math.random() * 400)+100,
               "text": ""
             });
           this.update(workspace.users, req.body.userId, "files", userWorkspace.files);
@@ -160,7 +167,7 @@ class Api {
             }
           });
 
-          let notes = await this.containsValue(userWorkspace.files, "note", true);
+          let notes = await this.containsValue(userWorkspace.files, "Заметка", true);
           for (let i = 0; i < notes.length; i++) {
             const fileToAdd = {
               "id": notes[i].id,
@@ -221,6 +228,21 @@ class Api {
       this.update(workspace.users, req.body.userId, "files", userWorkspace.files);
       const json = JSON.stringify(workspace);
       fs.writeFileSync('./workspace.json', json);
+
+      res.send();
+    }
+
+    this.delete = async (req, res) => {
+      const filesData = fs.readFileSync('./workspace.json');
+      const workspace = JSON.parse(filesData);
+      let userWorkspace = await this.containsValue(workspace.users, req.body.userId, false);
+
+      userWorkspace.files = userWorkspace.files.filter((o) => { return o.id !== req.body.fileId });
+      this.update(workspace.users, req.body.userId, "files", userWorkspace.files);
+
+      const json = JSON.stringify(workspace);
+      fs.writeFileSync('./workspace.json', json);
+      res.send();
     }
   }
 }

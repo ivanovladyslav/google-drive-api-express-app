@@ -24,6 +24,7 @@ app.use("/api", router.get('/isAuthenticated', api.isAuthenticated));
 app.use("/api", router.get('/popup-close', api.popupClose));
 app.use("/api", router.post('/save', api.save));
 app.use("/api", router.post('/upload-text', api.uploadText));
+app.use("/api", router.post('/delete', api.delete));
 
 app.listen(port, () => {
   console.log("Server is running on port: "+port);
