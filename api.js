@@ -101,6 +101,7 @@ class Api {
                 this.update(workspace.users, req.body.userId, "files", userWorkspace.files);
                 const json = JSON.stringify(workspace);
                 fs.writeFileSync('./workspace.json', json);
+                fs.unlinkSync(`./uploads/${req.file.filename}`);
                 res.send();
               }
             });
@@ -237,7 +238,12 @@ class Api {
       const workspace = JSON.parse(filesData);
       let userWorkspace = await this.containsValue(workspace.users, req.body.userId, false);
 
-      userWorkspace.files = userWorkspace.files.filter((o) => { return o.id !== req.body.fileId });
+      userWorkspace.files = userWorkspace.files.map((file) => {
+        if(file.id === req.body.fileId) {
+          file.name = "null"
+        }
+        return file;
+      });
       this.update(workspace.users, req.body.userId, "files", userWorkspace.files);
 
       const json = JSON.stringify(workspace);
