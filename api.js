@@ -96,7 +96,8 @@ class Api {
                     "name": req.file.originalname,
                     "x": 100,
                     "y": 100,
-                    "text": ""
+                    "text": "",
+                    "conns": []
                   });
                 this.update(workspace.users, req.body.userId, "files", userWorkspace.files);
                 const json = JSON.stringify(workspace);
@@ -120,7 +121,8 @@ class Api {
               "name": "Заметка " + userWorkspace.files.length,
               "x": Math.floor(Math.random() * 1000)+100,
               "y": Math.floor(Math.random() * 400)+100,
-              "text": ""
+              "text": "",
+              "conns": []
             });
           this.update(workspace.users, req.body.userId, "files", userWorkspace.files);
           const json = JSON.stringify(workspace);
@@ -162,7 +164,8 @@ class Api {
                 "link": file.webViewLink,
                 "x": workspaceFile.x,
                 "y": workspaceFile.y,
-                "text": workspaceFile.text
+                "text": workspaceFile.text,
+                "conns": workspaceFile.conns
               }
               filesToSend.push(fileToAdd);
             }
@@ -177,7 +180,8 @@ class Api {
               "link": "",
               "x": notes[i].x,
               "y": notes[i].y,
-              "text": notes[i].text
+              "text": notes[i].text,
+              "conns": notes[i].conns
             }
             filesToSend.push(fileToAdd);
           }
@@ -223,6 +227,7 @@ class Api {
             userWorkspace.files[j].x = req.body.filesPositions[i].x;
             userWorkspace.files[j].y = req.body.filesPositions[i].y;
             userWorkspace.files[j].text = req.body.filesPositions[i].text;
+            userWorkspace.files[j].conns = req.body.filesPositions[i].conns;
           }
         }
       }
