@@ -116,8 +116,8 @@ class Api {
           const workspace = JSON.parse(data);
           const userWorkspace = await this.containsValue(workspace.users, req.body.userId, false);
           userWorkspace.files.push({
-              "id": userWorkspace.files.length,
-              "name": "Заметка " + userWorkspace.files.length,
+              "id": userWorkspace.files.length+1,
+              "name": "Заметка " + userWorkspace.files.length + 1,
               "x": Math.floor(Math.random() * 1000)+100,
               "y": Math.floor(Math.random() * 400)+100,
               "text": "",
