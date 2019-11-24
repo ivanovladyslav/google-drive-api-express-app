@@ -66,7 +66,7 @@ class Api {
                 fs.writeFileSync('./workspace.json', json);
               }});
           }
-        })
+        });
       }
     }
 
@@ -96,7 +96,8 @@ class Api {
                   "x": 100,
                   "y": 100,
                   "text": "",
-                  "conns": []
+                  "conns": [],
+                  "type": "file"
                 });
               this.update(workspace.users, req.body.userId, "files", userWorkspace.files);
               const json = JSON.stringify(workspace);
@@ -121,7 +122,8 @@ class Api {
               "x": Math.floor(Math.random() * 1000)+100,
               "y": Math.floor(Math.random() * 400)+100,
               "text": "",
-              "conns": []
+              "conns": [],
+              "type": "note"
             });
           this.update(workspace.users, req.body.userId, "files", userWorkspace.files);
           const json = JSON.stringify(workspace);
@@ -142,7 +144,10 @@ class Api {
         `mimeType = 'application/vnd.google-apps.document' 
         or mimeType = 'application/pdf' 
         or mimeType = 'image/png' 
-        or mimeType = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'`
+        or mimeType = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+        or mimeType = 'application/epub+zip'
+        or mimeType = 'image/jpeg'
+        or mimeType = 'application/octet-stream'`
       }, async (err, response) => {
         if (err) return console.log('The API returned an error: ' + err);
         const files = await response.data.files;
@@ -159,7 +164,8 @@ class Api {
                 "x": workspaceFile.x,
                 "y": workspaceFile.y,
                 "text": workspaceFile.text,
-                "conns": workspaceFile.conns
+                "conns": workspaceFile.conns,
+                "type": workspaceFile.type
               }
               filesToSend.push(fileToAdd);
             }
@@ -175,7 +181,8 @@ class Api {
               "x": notes[i].x,
               "y": notes[i].y,
               "text": notes[i].text,
-              "conns": notes[i].conns
+              "conns": notes[i].conns,
+              "type": notes[i].type
             }
             filesToSend.push(fileToAdd);
           }
@@ -234,7 +241,6 @@ class Api {
       fs.writeFileSync('./workspace.json', json);
       res.send();
     }
-
     
     this.containsValue = (arr, value, include) => {
       if(!include) {
