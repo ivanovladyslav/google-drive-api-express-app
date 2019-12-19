@@ -22,9 +22,11 @@ app.use("/api", router.get('/getAccessToken', api.getAccessToken));
 app.use("/api", router.get('/authenticate', api.authenticate));
 app.use("/api", router.get('/isAuthenticated', api.isAuthenticated));
 app.use("/api", router.get('/popup-close', api.popupClose));
+app.use("/api", router.get('/getWorkspaces', api.getWorkspaces));
 app.use("/api", router.post('/save', api.save));
 app.use("/api", router.post('/upload-text', api.uploadText));
 app.use("/api", router.post('/delete', api.delete));
+app.use("/api", router.post('/createWorkspace', api.createWorkspace));
 
 app.listen(port, () => {
   console.log("Server is running on port: "+port);

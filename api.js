@@ -47,20 +47,20 @@ class Api {
     }
 
     this.isAuthenticated = (req, res) => {
-      if(this.drive != "") {
+      if (this.drive != "") {
         const app = this;
         request('https://www.googleapis.com/oauth2/v3/tokeninfo?id_token='+app.token.id_token, (e, r, body) => {
-          if(!e && r.statusCode == 200) {
+          if (!e && r.statusCode == 200) {
             const id = JSON.parse(body).sub;
             res.send({ userId: id });
             app.token = "";
             fs.readFile('./workspace.json', async (err, data) => {
-              if(err) {console.log(err)}
+              if (err) {console.log(err)}
               else {
                 const workspace = JSON.parse(data);
                 const userWorkspace = await this.containsValue(workspace.users, id, false);
-                if(!userWorkspace) {
-                  workspace.users.push({ name: id, files: []});
+                if (!userWorkspace) {
+                  workspace.users.push({ name: id, workspaces: [{name: "Main",files:[]}], files: []});
                 }
                 const json = JSON.stringify(workspace);
                 fs.writeFileSync('./workspace.json', json);
@@ -68,6 +68,35 @@ class Api {
           }
         });
       }
+    }
+
+    this.createWorkspace = (req, res) => {
+      fs.readFile('./workspace.json', async (err, data) => {
+        const usersData = JSON.parse(data);
+        const user = await this.containsValue(usersData.users, req.body.userId, false);
+        const workspace = await this.containsValue(user, req.body.workspaceName, false);
+        if (!workspace) {
+          user.workspaces.push({
+            "name": req.body.workspaceName,
+            "files": []
+          })
+          this.update(usersData.users, req.body.userId, "workspaces", user.workspaces);
+          const json = JSON.stringify(usersData);
+          fs.writeFileSync('./workspace.json', json);
+          res.send(user);
+        } else {
+          res.send('error');
+        }
+      });
+    }
+
+    this.getWorkspaces = (req, res) => {      
+      fs.readFile('./workspace.json', async (err, data) => {
+        const usersData = JSON.parse(data);
+        const user = await this.containsValue(usersData.users, req.query.userId, false);
+        console.log(user);
+        res.send(user.workspaces);
+      });
     }
 
     this.upload = async (req, res) => {
@@ -89,7 +118,8 @@ class Api {
             if(err) {console.log(err)}
             else {
               const workspace = JSON.parse(data);
-              const userWorkspace = await this.containsValue(workspace.users, req.body.userId, false);
+              const user = await this.containsValue(workspace.users, req.body.userId, false);
+              const userWorkspace = await this.containsValue(user.workspaces, req.body.workspaceId, false);
               userWorkspace.files.push({
                   "id": file.data.id,
                   "name": req.file.originalname,
@@ -99,7 +129,8 @@ class Api {
                   "conns": [],
                   "type": "file"
                 });
-              this.update(workspace.users, req.body.userId, "files", userWorkspace.files);
+              this.update(user.workspaces, req.body.workspaceId, "files", userWorkspace.files);
+              this.update(workspace.users, req.body.userId, "workspaces", user.workspaces);
               const json = JSON.stringify(workspace);
               fs.writeFileSync('./workspace.json', json);
               fs.unlinkSync(`./uploads/${req.file.filename}`);
@@ -115,7 +146,8 @@ class Api {
         if(err) {console.log(err)}
         else {
           const workspace = JSON.parse(data);
-          const userWorkspace = await this.containsValue(workspace.users, req.body.userId, false);
+          const user = await this.containsValue(workspace.users, req.body.userId, false);
+          const userWorkspace = await this.containsValue(user.workspaces, req.body.workspaceId, false);
           userWorkspace.files.push({
               "id": userWorkspace.files.length+1,
               "name": "Заметка " + userWorkspace.files.length + 1,
@@ -125,7 +157,8 @@ class Api {
               "conns": [],
               "type": "note"
             });
-          this.update(workspace.users, req.body.userId, "files", userWorkspace.files);
+          this.update(user.workspaces, req.body.workspaceId, "files", userWorkspace.files);
+          this.update(workspace.users, req.body.userId, "workspaces", user.workspaces);
           const json = JSON.stringify(workspace);
           fs.writeFileSync('./workspace.json', json);
         }
@@ -152,7 +185,8 @@ class Api {
         if (err) return console.log('The API returned an error: ' + err);
         const files = await response.data.files;
         if (files.length) {
-          let userWorkspace = await this.containsValue(workspace.users, req.query.userId, false);
+          let user = await this.containsValue(workspace.users, req.query.userId, false);
+          const userWorkspace = await this.containsValue(user.workspaces, req.query.workspaceId, false);
           await files.map(async (file) => {
             let workspaceFile = await this.containsValue(userWorkspace.files, file.name, false);
             if (workspaceFile) {
@@ -190,7 +224,6 @@ class Api {
           filesToSend.sort((a, b) => {
             return a.id - b.id;
           })
-          console.log(filesToSend);
           res.send(filesToSend);
         } else {
           console.log('No files found.');
@@ -201,7 +234,8 @@ class Api {
     this.save = async (req, res) => {
       const filesData = fs.readFileSync('./workspace.json');
       const workspace = JSON.parse(filesData);
-      const userWorkspace = await this.containsValue(workspace.users, req.body.userId, false);
+      const user = await this.containsValue(workspace.users, req.body.userId, false);
+      const userWorkspace = await this.containsValue(user.workspaces, req.body.workspaceId, false);
 
       for(let i = 0; i < req.body.filesPositions.length; i++) {
         for(let j = 0; j < userWorkspace.files.length; j++) {
@@ -213,7 +247,8 @@ class Api {
           }
         }
       }
-      this.update(workspace.users, req.body.userId, "files", userWorkspace.files);
+      this.update(user.workspaces, req.body.workspaceId, "files", userWorkspace.files);
+      this.update(workspace.users, req.body.userId, "workspaces", user.workspaces);
       const json = JSON.stringify(workspace);
       fs.writeFileSync('./workspace.json', json);
 
@@ -223,7 +258,8 @@ class Api {
     this.delete = async (req, res) => {
       const filesData = fs.readFileSync('./workspace.json');
       const workspace = JSON.parse(filesData);
-      let userWorkspace = await this.containsValue(workspace.users, req.body.userId, false);
+      const user = await this.containsValue(workspace.users, req.body.userId, false);
+      const userWorkspace = await this.containsValue(user.workspaces, req.body.workspaceId, false);
 
       this.drive.files.delete({
         'fileId': req.body.fileId
@@ -235,7 +271,8 @@ class Api {
         }
         return file;
       });
-      this.update(workspace.users, req.body.userId, "files", userWorkspace.files);
+      this.update(user.workspaces, req.body.workspaceId, "files", userWorkspace.files);
+      this.update(workspace.users, req.body.userId, "workspaces", user.workspaces);
 
       const json = JSON.stringify(workspace);
       fs.writeFileSync('./workspace.json', json);
